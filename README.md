@@ -145,6 +145,9 @@ npm install -g agent-browser
 
 # Claude Code
 irm https://claude.ai/install.ps1 | iex
+
+# herdr (x86_64 only; adds a Start menu entry)
+irm https://releases.herdr.dev/app/install.ps1 | iex
 ```
 
 Close and reopen the terminal afterwards so the new `PATH` entries take effect.
@@ -239,4 +242,3 @@ Reload it with `. $PROFILE`.
 | colima | Docker Desktop (step 2) |
 | mole | none |
 | zsh-autosuggestions / zsh-syntax-highlighting | PSReadLine (step 4), or zsh inside WSL |
-| herdr | check whether the project supports Windows |
