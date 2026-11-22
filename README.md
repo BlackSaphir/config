@@ -37,6 +37,16 @@ Changes you make in the iTerm2 settings UI are not written back to this file.
 To update the repo, edit `iterm2/profile.json` directly. Because it's a symlink,
 iTerm2 picks up the edits right away.
 
+### yazi theme
+
+`yazi/theme.toml` shows folders in a light blue instead of the terminal's dark
+ANSI blue. Link it into yazi's config folder:
+
+```sh
+mkdir -p ~/.config/yazi
+ln -sf "$PWD/yazi/theme.toml" ~/.config/yazi/theme.toml
+```
+
 ### Terminal.app (if not using iTerm2)
 
 Settings → Profiles → (your profile) → Text → Font → Change… → `Hack Nerd Font`.
@@ -51,6 +61,22 @@ eval "$(mise activate zsh)"
 
 # Autosuggestions
 source $(brew --prefix)/share/zsh-autosuggestions/zsh-autosuggestions.zsh
+
+# Prompt
+eval "$(starship init zsh)"
+
+# zoxide: `z <part of path>` jumps to a folder, `zi` opens an interactive picker
+eval "$(zoxide init zsh)"
+
+# yazi: start with `y`; when you quit with `q`, the shell changes to the
+# folder you were in (`Q` quits without changing folder)
+function y() {
+  local tmp="$(mktemp -t "yazi-cwd.XXXXXX")" cwd
+  yazi "$@" --cwd-file="$tmp"
+  IFS= read -r -d '' cwd < "$tmp"
+  [ -n "$cwd" ] && [ "$cwd" != "$PWD" ] && builtin cd -- "$cwd"
+  rm -f -- "$tmp"
+}
 
 # Aliases
 alias ls='lsd'
@@ -92,6 +118,18 @@ winget install junegunn.fzf
 winget install jdx.mise
 winget install Tailscale.Tailscale
 winget install Docker.DockerDesktop   # provides docker, buildx and compose (replaces colima)
+winget install ajeetdsouza.zoxide
+winget install sxyazi.yazi
+winget install sharkdp.fd
+winget install BurntSushi.ripgrep.MSVC
+winget install Starship.Starship
+```
+
+yazi uses `file.exe` from Git for Windows to detect file types. Point it there
+once:
+
+```powershell
+[Environment]::SetEnvironmentVariable("YAZI_FILE_ONE", "C:\Program Files\Git\usr\bin\file.exe", "User")
 ```
 
 Tools that are not on winget:
@@ -110,6 +148,13 @@ irm https://claude.ai/install.ps1 | iex
 ```
 
 Close and reopen the terminal afterwards so the new `PATH` entries take effect.
+
+Apply the yazi theme from this repo (run inside the cloned `config` folder):
+
+```powershell
+New-Item -ItemType Directory -Force "$env:APPDATA\yazi\config" | Out-Null
+Copy-Item .\yazi\theme.toml "$env:APPDATA\yazi\config\theme.toml"
+```
 
 ### 3. Install a Nerd Font
 
@@ -156,6 +201,23 @@ Import-Module Terminal-Icons
 
 # mise
 mise activate pwsh | Out-String | Invoke-Expression
+
+# Prompt
+Invoke-Expression (&starship init powershell)
+
+# zoxide: `z <part of path>` jumps to a folder, `zi` opens an interactive picker
+Invoke-Expression (& { (zoxide init powershell | Out-String) })
+
+# yazi: start with `y`; quitting with `q` changes to the folder you were in
+function y {
+    $tmp = (New-TemporaryFile).FullName
+    yazi $args --cwd-file="$tmp"
+    $cwd = Get-Content -Path $tmp -Encoding UTF8
+    if (-not [String]::IsNullOrEmpty($cwd) -and $cwd -ne $PWD.Path) {
+        Set-Location -LiteralPath (Resolve-Path -LiteralPath $cwd).Path
+    }
+    Remove-Item -Path $tmp
+}
 
 # Aliases (same as macOS)
 Remove-Item Alias:ls, Alias:cat -Force -ErrorAction SilentlyContinue

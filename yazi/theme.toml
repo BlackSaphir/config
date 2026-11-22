@@ -1,0 +1,26 @@
+# yazi colours. Docs: https://yazi-rs.github.io/docs/configuration/theme
+#
+# Folders used the terminal's ANSI "blue", which is very dark in iTerm2's
+# default colour scheme. They now use a lighter blue that is readable on a
+# dark background.
+
+[filetype]
+rules = [
+	# Images, media, documents
+	{ mime = "**/image/*", fg = "yellow" },
+	{ mime = "**/{audio,video}/*", fg = "magenta" },
+	{ mime = "**/application/{pdf,doc,rtf}", fg = "cyan" },
+
+	# Archives
+	{ mime = "**/application/{zip,rar,7z*,tar,gzip,xz,zstd,bzip*,lzma,compress,archive,cpio,arj,xar,ms-cab*}", fg = "red" },
+
+	# Special files
+	{ mime = "vfs/{absent,stale}", fg = "gray" },
+	{ url = "*", is = "orphan", bg = "red" },
+	{ url = "*", is = "exec", fg = "green" },
+	{ url = "*", is = "dummy", bg = "red" },
+	{ url = "*/", is = "dummy", bg = "red" },
+
+	# Folders (default was "blue")
+	{ url = "*/", fg = "#7dcfff" },
+]
