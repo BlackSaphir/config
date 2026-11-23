@@ -6,6 +6,11 @@ install steps, see the [README](README.md).
 - [macOS](#macos)
   - [`brew bundle`: iTerm2 "already exists"](#brew-bundle-iterm2-already-exists)
   - [Double-tap Control doesn't open the iTerm2 hotkey window](#double-tap-control-doesnt-open-the-iterm2-hotkey-window)
+- [Ubuntu](#ubuntu)
+  - [`chsh`: "user … does not exist in /etc/passwd"](#chsh-user--does-not-exist-in-etcpasswd)
+  - [Starship: "Unknown key" warnings](#starship-unknown-key-warnings)
+  - [Claude Code doesn't install](#claude-code-doesnt-install)
+  - [setopt: "Command 'setopt' not found"](#setopt-command-setopt-not-found)
 - [Windows](#windows)
   - [Prerequisites](#prerequisites)
   - [zip packages fail with "Failed to extract archive"](#zip-packages-fail-with-failed-to-extract-archive)
@@ -56,6 +61,52 @@ this is easy to miss.
 
 Also check that the **config** profile is the default and no other profile has a
 hotkey window: Settings → Profiles → (profile) → Keys → Configure Hotkey Window.
+
+## Ubuntu
+
+### `chsh`: "user … does not exist in /etc/passwd"
+
+**Cause:** you sign in with a domain account (LDAP or Active Directory, user
+names like `DOMAIN\user`). Those accounts aren't in `/etc/passwd`, so `chsh`
+can't change their login shell.
+
+**Fix:** `install.sh` detects this and adds a block to the top of `~/.bashrc`
+that switches interactive bash sessions to zsh. To get a plain bash anyway, run
+`CONFIG_NO_ZSH=1 bash`.
+
+### Starship: "Unknown key" warnings
+
+For example `Error in 'StarshipRoot' at 'jj_bookmark': Unknown key`.
+
+**Cause:** an older Starship runs instead of the one from Homebrew. Often mise
+installed its own copy, and mise's tools come first on `PATH`. Check with:
+
+```sh
+type -a starship; starship --version
+```
+
+**Fix:** let Homebrew manage it, then open a new terminal:
+
+```sh
+mise unuse -g starship
+```
+
+The check at the end of `install.sh` warns about every tool that mise also
+manages.
+
+### Claude Code doesn't install
+
+Some managed machines block it. `install.sh` only warns about it and sets up
+everything else. Skip it entirely with:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/BlackSaphir/config/main/install.sh | CONFIG_CLAUDE=0 bash
+```
+
+### setopt: "Command 'setopt' not found"
+
+The zsh lines from the README were run in bash, or put in `~/.bashrc`. They
+belong in `~/.zshrc`.
 
 ## Windows
 

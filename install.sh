@@ -16,6 +16,7 @@
 # Environment variables to change what it does:
 #     CONFIG_DOCKER=1   install Docker Engine without asking
 #     CONFIG_DOCKER=0   skip Docker Engine without asking
+#     CONFIG_CLAUDE=0   skip Claude Code (for machines where it isn't allowed)
 #     CONFIG_DIR=...    where to clone the repo (default: ~/config)
 
 # Everything is inside main(), so a partly downloaded script never runs.
@@ -90,6 +91,36 @@ main() {
         else
             fail "Could not link $dest"
         fi
+    }
+
+    # Writes a managed block (between the BlackSaphir/config markers) to the
+    # top or bottom of a file. An existing block is replaced; the file is
+    # backed up first, and left alone if nothing changes.
+    write_block() {
+        local file="$1" block="$2" where="$3" new rest bak=''
+        new="$(mktemp)"; rest="$(mktemp)"
+        if [ -f "$file" ]; then
+            # Everything outside the markers, without leading or trailing blank lines.
+            awk '/^# >>> BlackSaphir\/config >>>$/{skip=1} !skip{print} /^# <<< BlackSaphir\/config <<<$/{skip=0}' "$file" \
+                | sed -e '/./,$!d' | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}' > "$rest"
+        fi
+        if [ "$where" = top ]; then
+            printf '%s\n' "$block" > "$new"
+            if [ -s "$rest" ]; then echo >> "$new"; cat "$rest" >> "$new"; fi
+        else
+            cat "$rest" > "$new"
+            if [ -s "$rest" ]; then echo >> "$new"; fi
+            printf '%s\n' "$block" >> "$new"
+        fi
+        rm -f "$rest"
+        if [ -f "$file" ] && cmp -s "$new" "$file"; then
+            skip "$file (up to date)"
+        else
+            if [ -f "$file" ]; then bak="$file.bak-$stamp"; cp "$file" "$bak"; fi
+            cat "$new" > "$file"
+            if [ -n "$bak" ]; then ok "$file (backup: $bak)"; else ok "$file"; fi
+        fi
+        rm -f "$new"
     }
 
     load_brew() {
@@ -204,13 +235,18 @@ main() {
 
     # ------------------------------------------------------------ 5. Claude Code
 
-    step 'Claude Code'
-    if have claude || [ -x "$HOME/.local/bin/claude" ]; then
+    # Optional: a failure is only a warning, because some managed machines block it.
+    step 'Claude Code (optional)'
+    local claude="${CONFIG_CLAUDE:-1}"
+    if [ "$claude" = 0 ]; then
+        skip 'CONFIG_CLAUDE=0'
+    elif have claude || [ -x "$HOME/.local/bin/claude" ]; then
         skip 'already installed'
     elif retry run_remote https://claude.ai/install.sh bash; then
         ok 'Claude Code'
     else
-        fail 'Claude Code install'
+        warn 'Claude Code could not be installed. The rest of the setup does not need it.'
+        notes+=('Claude Code: try again with `curl -fsSL https://claude.ai/install.sh | bash`, or skip it with CONFIG_CLAUDE=0.')
     fi
 
     # ------------------------------------------------------------ 6. Docker Engine
@@ -352,34 +388,39 @@ alias cat='bat --paging=never'
 # <<< BlackSaphir/config <<<
 EOF
     block="${block%$'\n'}"
-    new="$(mktemp)"
-    if [ -f "$zshrc" ]; then
-        # Keep everything outside the markers, then append the new block.
-        awk '/^# >>> BlackSaphir\/config >>>$/{skip=1} !skip{print} /^# <<< BlackSaphir\/config <<<$/{skip=0}' "$zshrc" \
-            | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}' > "$new"
-        [ -s "$new" ] && echo >> "$new"
-    fi
-    printf '%s\n' "$block" >> "$new"
-    if [ -f "$zshrc" ] && cmp -s "$new" "$zshrc"; then
-        skip "$zshrc (up to date)"
-        rm -f "$new"
-    else
-        local bak=''
-        if [ -f "$zshrc" ]; then bak="$zshrc.bak-$stamp"; cp "$zshrc" "$bak"; fi
-        mv "$new" "$zshrc"
-        if [ -n "$bak" ]; then ok "$zshrc (backup: $bak)"; else ok "$zshrc"; fi
-    fi
+    write_block "$zshrc" "$block" bottom
 
-    local zsh_path; zsh_path="$(command -v zsh || true)"
+    # Use the apt zsh (it is in /etc/shells), not one from Homebrew.
+    local zsh_path=/usr/bin/zsh
+    [ -x "$zsh_path" ] || zsh_path="$(command -v zsh || true)"
+    local login_shell; login_shell="$(getent passwd "$USER" | cut -d: -f7)"
     if [ -z "$zsh_path" ]; then
         fail 'zsh not found'
-    elif [ "$(getent passwd "$USER" | cut -d: -f7)" = "$zsh_path" ]; then
+    elif [[ "$login_shell" == */zsh ]]; then
         skip 'zsh is already the login shell'
-    elif sudo chsh -s "$zsh_path" "$USER"; then
+    elif U="$USER" awk -F: '$1 == ENVIRON["U"] { found = 1 } END { exit !found }' /etc/passwd \
+        && sudo chsh -s "$zsh_path" "$USER"; then
         ok "login shell = $zsh_path"
         notes+=('zsh: log out and back in to make it your default shell (or run `exec zsh` now).')
     else
-        fail 'Could not make zsh the login shell (chsh)'
+        # Domain accounts (LDAP / Active Directory) are not in /etc/passwd, so
+        # chsh can't change their shell. Switch to zsh from ~/.bashrc instead.
+        warn "chsh can't change the shell of this account (domain account?); starting zsh from ~/.bashrc instead"
+        local bash_block
+        IFS= read -r -d '' bash_block <<EOF
+# >>> BlackSaphir/config >>>
+# Managed by install.sh from github.com/BlackSaphir/config.
+# The login shell of this account can't be changed with chsh, so interactive
+# bash sessions switch to zsh here. To stay in bash: CONFIG_NO_ZSH=1 bash
+if [[ \$- == *i* ]] && [ -z "\${CONFIG_NO_ZSH:-}" ] && [ -x $zsh_path ]; then
+  export CONFIG_NO_ZSH=1   # a bash started from zsh stays bash
+  exec $zsh_path
+fi
+# <<< BlackSaphir/config <<<
+EOF
+        bash_block="${bash_block%$'\n'}"
+        write_block "$HOME/.bashrc" "$bash_block" top
+        notes+=('zsh: open a new terminal; it starts zsh via ~/.bashrc.')
     fi
 
     # ------------------------------------------------------------ 11. Tailscale (last)
@@ -400,11 +441,26 @@ EOF
     step 'Check'
     load_brew >/dev/null 2>&1
     export PATH="$HOME/.local/bin:$PATH"
-    local tools=(zsh git gh git-lfs gitleaks starship eza lsd bat fd rg mise zoxide yazi agent-browser herdr claude tailscale) t
+    local tools=(zsh git gh git-lfs gitleaks starship eza lsd bat fd rg mise zoxide yazi agent-browser herdr tailscale) t
     [ "$docker" = 1 ] && tools+=(docker)
     for t in "${tools[@]}"; do
         if have "$t"; then ok "$t"; else fail "$t not found on PATH"; fi
     done
+    if [ "$claude" != 0 ]; then
+        if have claude; then ok 'claude'; else warn 'claude not found (optional)'; fi
+    fi
+
+    # mise puts its tools before Homebrew's on PATH, so a tool that mise also
+    # manages globally runs in mise's (often older) version.
+    if have mise; then
+        local mise_tools
+        mise_tools="$(mise ls --global 2>/dev/null | awk '{ sub(/.*:/, "", $1); print $1 }')"
+        for t in "${tools[@]}"; do
+            if grep -qx -- "$t" <<< "$mise_tools"; then
+                warn "mise also installs $t, and its version comes first on PATH. Remove it with: mise unuse -g $t"
+            fi
+        done
+    fi
 
     # ------------------------------------------------------------ summary
 
