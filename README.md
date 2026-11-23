@@ -109,6 +109,76 @@ source $(brew --prefix)/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zs
 
 Then reload the shell with `exec zsh`.
 
+## Ubuntu
+
+Uses [Homebrew on Linux](https://docs.brew.sh/Homebrew-on-Linux) and the same
+`Brewfile`, so the tools and versions match macOS. The terminal is Ubuntu's
+default one: **Ptyxis** from 25.10 on, **GNOME Terminal** before that.
+
+### Quick install
+
+As your normal user (not root), in the Ubuntu desktop:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/BlackSaphir/config/main/install.sh | bash
+```
+
+[`install.sh`](install.sh):
+
+- clones this repo to `~/config` (change it with `CONFIG_DIR=...`)
+- installs Homebrew and everything in the `Brewfile`
+- installs Claude Code, Tailscale and, if you want it, Docker Engine with their
+  official installers
+- installs Hack Nerd Font to `~/.local/share/fonts`
+- sets the font in Ptyxis or GNOME Terminal
+- symlinks the Starship and yazi configs
+- writes a block to `~/.zshrc` and makes zsh your login shell
+
+It asks for your sudo password once. Like `install.ps1`, it skips what's already
+done and backs up every file it changes. Log out and back in afterwards.
+
+### Manual install
+
+```sh
+sudo apt install -y build-essential procps curl file git zsh unzip fontconfig
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+
+git clone https://github.com/BlackSaphir/config.git ~/config
+cd ~/config
+brew bundle --file=Brewfile
+curl -fsSL https://claude.ai/install.sh | bash        # Claude Code
+curl -fsSL https://tailscale.com/install.sh | sh      # Tailscale
+```
+
+The `Brewfile` skips the macOS-only entries (casks, colima, mole) on Linux. For
+Docker, install [Docker Engine](https://docs.docker.com/engine/install/ubuntu/).
+
+Font: download `Hack.zip` from
+<https://github.com/ryanoasis/nerd-fonts/releases/latest>, extract the
+`HackNerdFont-*.ttf` files to `~/.local/share/fonts` and run `fc-cache -f`. Then
+set it in the terminal, either in its settings or with:
+
+```sh
+# Ptyxis (Ubuntu 25.10 and later)
+gsettings set org.gnome.Ptyxis use-system-font false
+gsettings set org.gnome.Ptyxis font-name 'Hack Nerd Font 12'
+```
+
+Link the Starship and yazi configs as in the macOS section. Use the zsh config
+from the macOS section too, with Homebrew and history added at the top (macOS
+sets history up in `/etc/zshrc`; Ubuntu doesn't):
+
+```zsh
+eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+export PATH="$HOME/.local/bin:$PATH"
+HISTFILE=~/.zsh_history HISTSIZE=10000 SAVEHIST=10000
+setopt share_history
+autoload -Uz compinit && compinit
+```
+
+Make zsh your shell with `chsh -s "$(command -v zsh)"`, then log out and back in.
+
 ## Windows (Windows Terminal)
 
 ### Quick install
