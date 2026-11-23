@@ -111,11 +111,32 @@ Then reload the shell with `exec zsh`.
 
 ## Windows (Windows Terminal)
 
+### Quick install
+
+In a **normal (non-admin)** PowerShell window (the built-in Windows PowerShell
+is fine):
+
+```powershell
+Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
+irm https://raw.githubusercontent.com/BlackSaphir/config/main/install.ps1 | iex
+```
+
+[`install.ps1`](install.ps1) does steps 1–5 below: installs all tools, the font
+and the PowerShell modules, sets up Windows Terminal, copies the Starship and
+yazi configs and writes the PowerShell profile. It asks whether to install
+Docker Desktop. It skips what's already done, so you can run it again, and
+backs up every file it changes (`*.bak-<timestamp>`).
+
+If Windows Terminal has never been opened, open it once and run the script
+again so it can set the font and default profile.
+
+### Manual install
+
 Run everything in a **normal (non-admin)** PowerShell 7 window, and reopen the
 terminal after each step so `PATH` updates. If something fails, see
 [TROUBLESHOOTING.md](TROUBLESHOOTING.md#windows).
 
-### 1. PowerShell 7 and script policy
+#### 1. PowerShell 7 and script policy
 
 ```powershell
 winget install Microsoft.PowerShell
@@ -125,7 +146,7 @@ Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
 In Windows Terminal: **Settings → Startup → Default profile → PowerShell** (black
 icon, not "Windows PowerShell").
 
-### 2. Let winget extract zips with `tar`
+#### 2. Let winget extract zips with `tar`
 
 Run `winget settings` and save:
 
@@ -139,7 +160,7 @@ Run `winget settings` and save:
 Without this, zip-based tools fail on some PCs
 ([details](TROUBLESHOOTING.md#zip-packages-fail-with-failed-to-extract-archive)).
 
-### 3. Install the tools
+#### 3. Install the tools
 
 ```powershell
 winget install Git.Git GitHub.cli OpenJS.NodeJS.LTS Gitleaks.Gitleaks Starship.Starship Tailscale.Tailscale Docker.DockerDesktop
@@ -167,14 +188,14 @@ Copy-Item .\starship\starship.toml "$env:USERPROFILE\.config\starship.toml"
 Copy-Item .\yazi\theme.toml "$env:APPDATA\yazi\config\theme.toml"
 ```
 
-### 4. Nerd Font
+#### 4. Nerd Font
 
 Download `Hack.zip` from
 <https://github.com/ryanoasis/nerd-fonts/releases/latest>, extract it, select the
 `HackNerdFont-*.ttf` files, right-click → **Install**. Then in Windows Terminal:
 **Settings → Profiles → Defaults → Appearance → Font face → `Hack Nerd Font`**.
 
-### 5. PowerShell profile
+#### 5. PowerShell profile
 
 ```powershell
 Install-Module PSFzf, Terminal-Icons -Scope CurrentUser
