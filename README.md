@@ -14,9 +14,8 @@ brew bundle --file=Brewfile
 
 This also installs **iTerm2** and **Hack Nerd Font**, which provides the icons used by `lsd`.
 
-> If iTerm2 is already installed outside Homebrew, `brew bundle` will report that the
-> app already exists. Either skip it or let Homebrew take it over with
-> `brew install --cask --force iterm2`.
+If iTerm2 "already exists", see
+[TROUBLESHOOTING.md](TROUBLESHOOTING.md#brew-bundle-iterm2-already-exists).
 
 ### iTerm2 profile
 
@@ -33,14 +32,10 @@ ln -sf "$PWD/iterm2/profile.json" ~/Library/Application\ Support/iTerm2/DynamicP
 iTerm2 loads it immediately. To make it the default, go to Settings → Profiles,
 select **config**, then choose **Other Actions… → Set as Default**.
 
-The profile opens a hotkey window when you **double-tap Control**. For this,
-iTerm2 needs the **Accessibility** permission:
-
-1. System Settings → Privacy & Security → **Accessibility**: add iTerm and turn it on.
-   If iTerm is already listed (for example after reinstalling it), remove it
-   with **−** and add it again; the old entry may no longer be valid.
-2. Quit iTerm2 completely (⌘Q) and start it again. Hotkeys are only registered
-   at launch.
+**Double-tap Control** opens a hotkey window. This needs the **Accessibility**
+permission for iTerm2 (System Settings → Privacy & Security → Accessibility),
+then a restart of iTerm2. If it doesn't work, see
+[TROUBLESHOOTING.md](TROUBLESHOOTING.md#double-tap-control-doesnt-open-the-iterm2-hotkey-window).
 
 Changes you make in the iTerm2 settings UI are not written back to this file.
 To update the repo, edit `iterm2/profile.json` directly. Because it's a symlink,
@@ -115,108 +110,81 @@ Then reload the shell with `exec zsh`.
 
 ## Windows (Windows Terminal)
 
-Run the commands below in a regular (non-admin) PowerShell window unless noted.
-Package IDs can change, so if one fails, look it up with `winget search <name>`.
+Run everything in a **normal (non-admin)** PowerShell 7 window, and reopen the
+terminal after each step so `PATH` updates. If something fails, see
+[TROUBLESHOOTING.md](TROUBLESHOOTING.md#windows).
 
-### 1. Install PowerShell 7 and make it the default
+### 1. PowerShell 7 and script policy
 
 ```powershell
 winget install Microsoft.PowerShell
+Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
 
-In Windows Terminal: **Settings → Startup → Default profile → PowerShell** (the
-one with the black icon, not "Windows PowerShell"). Do all of the following steps in PowerShell 7.
+In Windows Terminal: **Settings → Startup → Default profile → PowerShell** (black
+icon, not "Windows PowerShell").
 
-### 2. Install the tools
+### 2. Let winget extract zips with `tar`
 
-```powershell
-winget install Git.Git            # includes git-lfs
-winget install GitHub.cli
-winget install sharkdp.bat
-winget install eza-community.eza
-winget install lsd-rs.lsd
-winget install junegunn.fzf
-winget install jdx.mise
-winget install Tailscale.Tailscale
-winget install Docker.DockerDesktop   # provides docker, buildx and compose (replaces colima)
-winget install ajeetdsouza.zoxide
-winget install sxyazi.yazi
-winget install sharkdp.fd
-winget install BurntSushi.ripgrep.MSVC
-winget install Starship.Starship
-```
-
-yazi uses `file.exe` from Git for Windows to detect file types. Point it there
-once:
-
-```powershell
-[Environment]::SetEnvironmentVariable("YAZI_FILE_ONE", "C:\Program Files\Git\usr\bin\file.exe", "User")
-```
-
-Tools that are not on winget:
-
-```powershell
-# Scoop (package manager), needed for gitleaks and the font
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-irm https://get.scoop.sh | iex
-scoop install gitleaks
-
-# agent-browser (requires Node.js: winget install OpenJS.NodeJS.LTS)
-npm install -g agent-browser
-
-# Claude Code
-irm https://claude.ai/install.ps1 | iex
-
-# herdr (x86_64 only; adds a Start menu entry)
-irm https://releases.herdr.dev/app/install.ps1 | iex
-```
-
-Close and reopen the terminal afterwards so the new `PATH` entries take effect.
-
-Apply the Starship prompt and yazi theme from this repo (run inside the cloned
-`config` folder):
-
-```powershell
-New-Item -ItemType Directory -Force "$env:USERPROFILE\.config" | Out-Null
-Copy-Item .\starship\starship.toml "$env:USERPROFILE\.config\starship.toml"
-
-New-Item -ItemType Directory -Force "$env:APPDATA\yazi\config" | Out-Null
-Copy-Item .\yazi\theme.toml "$env:APPDATA\yazi\config\theme.toml"
-```
-
-### 3. Install a Nerd Font
-
-```powershell
-scoop bucket add nerd-fonts
-scoop install Hack-NF
-```
-
-In Windows Terminal: **Settings → Profiles → Defaults → Appearance → Font face →
-`Hack Nerd Font`**. Or set it in `settings.json`:
+Run `winget settings` and save:
 
 ```json
-"profiles": {
-  "defaults": {
-    "font": { "face": "Hack Nerd Font" }
-  }
+{
+  "$schema": "https://aka.ms/winget-settings.schema.json",
+  "installBehavior": { "archiveExtractionMethod": "tar" }
 }
 ```
 
-### 4. Configure the PowerShell profile
+Without this, zip-based tools fail on some PCs
+([details](TROUBLESHOOTING.md#zip-packages-fail-with-failed-to-extract-archive)).
 
-Install the optional modules:
+### 3. Install the tools
 
 ```powershell
-Install-Module PSFzf -Scope CurrentUser
-Install-Module Terminal-Icons -Scope CurrentUser
+winget install Git.Git GitHub.cli OpenJS.NodeJS.LTS Gitleaks.Gitleaks Starship.Starship Tailscale.Tailscale Docker.DockerDesktop
+winget install eza-community.eza lsd-rs.lsd sharkdp.bat junegunn.fzf jdx.mise ajeetdsouza.zoxide sxyazi.yazi sharkdp.fd BurntSushi.ripgrep.MSVC
+
+[Environment]::SetEnvironmentVariable("YAZI_FILE_ONE", "C:\Program Files\Git\usr\bin\file.exe", "User")
 ```
 
-Open the profile (`notepad $PROFILE`, creating it first with
-`New-Item -Path $PROFILE -ItemType File -Force` if it doesn't exist) and add:
+Docker Desktop provides docker, buildx and compose (replaces colima). Git for
+Windows includes git-lfs and the `file.exe` yazi needs.
+
+In a new terminal:
 
 ```powershell
-# Autosuggestions from history (zsh-autosuggestions equivalent).
-# Syntax highlighting is built into PSReadLine.
+npm install -g agent-browser
+irm https://claude.ai/install.ps1 | iex                # Claude Code
+irm https://releases.herdr.dev/app/install.ps1 | iex   # herdr (x86_64 only)
+```
+
+Apply the Starship prompt and yazi theme (inside the cloned `config` folder):
+
+```powershell
+New-Item -ItemType Directory -Force "$env:USERPROFILE\.config", "$env:APPDATA\yazi\config" | Out-Null
+Copy-Item .\starship\starship.toml "$env:USERPROFILE\.config\starship.toml"
+Copy-Item .\yazi\theme.toml "$env:APPDATA\yazi\config\theme.toml"
+```
+
+### 4. Nerd Font
+
+Download `Hack.zip` from
+<https://github.com/ryanoasis/nerd-fonts/releases/latest>, extract it, select the
+`HackNerdFont-*.ttf` files, right-click → **Install**. Then in Windows Terminal:
+**Settings → Profiles → Defaults → Appearance → Font face → `Hack Nerd Font`**.
+
+### 5. PowerShell profile
+
+```powershell
+Install-Module PSFzf, Terminal-Icons -Scope CurrentUser
+New-Item -Path $PROFILE -ItemType File -Force   # only if it doesn't exist yet
+notepad $PROFILE
+```
+
+Add:
+
+```powershell
+# Autosuggestions from history; syntax highlighting is built into PSReadLine
 Set-PSReadLineOption -PredictionSource History -PredictionViewStyle InlineView
 Set-PSReadLineKeyHandler -Key Tab -Function MenuComplete
 
@@ -224,19 +192,12 @@ Set-PSReadLineKeyHandler -Key Tab -Function MenuComplete
 Import-Module PSFzf
 Set-PsFzfOption -PSReadlineChordProvider 'Ctrl+t' -PSReadlineChordReverseHistory 'Ctrl+r'
 
-# File icons
 Import-Module Terminal-Icons
-
-# mise
 mise activate pwsh | Out-String | Invoke-Expression
-
-# Prompt
 Invoke-Expression (&starship init powershell)
+Invoke-Expression (& { (zoxide init powershell | Out-String) })   # z, zi
 
-# zoxide: `z <part of path>` jumps to a folder, `zi` opens an interactive picker
-Invoke-Expression (& { (zoxide init powershell | Out-String) })
-
-# yazi: start with `y`; quitting with `q` changes to the folder you were in
+# yazi: start with `y`; `q` quits and changes to the folder you were in
 function y {
     $tmp = (New-TemporaryFile).FullName
     yazi $args --cwd-file="$tmp"
@@ -255,15 +216,15 @@ function la  { lsd -a @args }
 function lla { lsd -la @args }
 function lt  { lsd --tree @args }
 function cat { bat --paging=never @args }
-
 ```
 
-Reload it with `. $PROFILE`.
+Reload with `. $PROFILE`. To check every tool, see
+[Check everything](TROUBLESHOOTING.md#check-everything).
 
 ### Not available on Windows
 
 | macOS tool | Windows alternative |
 |---|---|
-| colima | Docker Desktop (step 2) |
+| colima | Docker Desktop |
 | mole | none |
-| zsh-autosuggestions / zsh-syntax-highlighting | PSReadLine (step 4), or zsh inside WSL |
+| zsh-autosuggestions / zsh-syntax-highlighting | PSReadLine (step 5), or zsh inside WSL |
