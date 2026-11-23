@@ -165,11 +165,16 @@ gsettings set org.gnome.Ptyxis use-system-font false
 gsettings set org.gnome.Ptyxis font-name 'Hack Nerd Font 12'
 ```
 
-Link the Starship and yazi configs as in the macOS section. Use the zsh config
-from the macOS section too, with Homebrew and history added at the top (macOS
-sets history up in `/etc/zshrc`; Ubuntu doesn't):
+Link the Starship and yazi configs as in the macOS section.
+
+The zsh config goes in `~/.zshrc`. Use the one from the macOS section, and add
+these lines at the very top (macOS sets history up in
+`/etc/zshrc`; Ubuntu doesn't). These are zsh commands: don't type them into
+bash or put them in `~/.bashrc`, where they fail with
+`Command 'setopt' not found`.
 
 ```zsh
+# Top of ~/.zshrc
 eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
 export PATH="$HOME/.local/bin:$PATH"
 HISTFILE=~/.zsh_history HISTSIZE=10000 SAVEHIST=10000
