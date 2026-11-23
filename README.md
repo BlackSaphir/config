@@ -98,6 +98,7 @@ function y() {
 alias ls='lsd'
 alias l='lsd -l'
 alias la='lsd -a'
+alias lsa='lsd -a'
 alias lla='lsd -la'
 alias lt='lsd --tree'
 alias cat='bat --paging=never'
@@ -213,6 +214,7 @@ Remove-Item Alias:ls, Alias:cat -Force -ErrorAction SilentlyContinue
 function ls  { lsd @args }
 function l   { lsd -l @args }
 function la  { lsd -a @args }
+function lsa { lsd -a @args }
 function lla { lsd -la @args }
 function lt  { lsd --tree @args }
 function cat { bat --paging=never @args }
