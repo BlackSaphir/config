@@ -33,6 +33,15 @@ ln -sf "$PWD/iterm2/profile.json" ~/Library/Application\ Support/iTerm2/DynamicP
 iTerm2 loads it immediately. To make it the default, go to Settings → Profiles,
 select **config**, then choose **Other Actions… → Set as Default**.
 
+The profile opens a hotkey window when you **double-tap Control**. For this,
+iTerm2 needs the **Accessibility** permission:
+
+1. System Settings → Privacy & Security → **Accessibility**: add iTerm and turn it on.
+   If iTerm is already listed (for example after reinstalling it), remove it
+   with **−** and add it again; the old entry may no longer be valid.
+2. Quit iTerm2 completely (⌘Q) and start it again. Hotkeys are only registered
+   at launch.
+
 Changes you make in the iTerm2 settings UI are not written back to this file.
 To update the repo, edit `iterm2/profile.json` directly. Because it's a symlink,
 iTerm2 picks up the edits right away.
