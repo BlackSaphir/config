@@ -37,6 +37,18 @@ Changes you make in the iTerm2 settings UI are not written back to this file.
 To update the repo, edit `iterm2/profile.json` directly. Because it's a symlink,
 iTerm2 picks up the edits right away.
 
+### Starship prompt
+
+`starship/starship.toml` is the prompt config (based on the `gruvbox-rainbow`
+preset). Link it into place:
+
+```sh
+mkdir -p ~/.config
+ln -sf "$PWD/starship/starship.toml" ~/.config/starship.toml
+```
+
+The next prompt picks it up; no restart needed.
+
 ### yazi theme
 
 `yazi/theme.toml` shows folders in a light blue instead of the terminal's dark
@@ -152,9 +164,13 @@ irm https://releases.herdr.dev/app/install.ps1 | iex
 
 Close and reopen the terminal afterwards so the new `PATH` entries take effect.
 
-Apply the yazi theme from this repo (run inside the cloned `config` folder):
+Apply the Starship prompt and yazi theme from this repo (run inside the cloned
+`config` folder):
 
 ```powershell
+New-Item -ItemType Directory -Force "$env:USERPROFILE\.config" | Out-Null
+Copy-Item .\starship\starship.toml "$env:USERPROFILE\.config\starship.toml"
+
 New-Item -ItemType Directory -Force "$env:APPDATA\yazi\config" | Out-Null
 Copy-Item .\yazi\theme.toml "$env:APPDATA\yazi\config\theme.toml"
 ```
