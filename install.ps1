@@ -18,6 +18,10 @@
     Environment variables to change what it does:
         CONFIG_DOCKER=1   install Docker Desktop without asking
         CONFIG_DOCKER=0   skip Docker Desktop without asking
+        CONFIG_SKIP='yazi herdr'
+                          don't install these programs: a winget ID or one of
+                          its parts (yazi, ripgrep, GitHub.cli, DockerDesktop),
+                          or agent-browser, claude, herdr
 #>
 
 function Install-Config {
@@ -99,7 +103,16 @@ function Install-Config {
     # the network, so a short outage doesn't fail the whole run.
     $Attempts = 2
 
+    # CONFIG_SKIP: space- or comma-separated names. A winget ID matches if the
+    # whole ID or one of its dot-separated parts is listed (case-insensitive).
+    $Skip = @(($env:CONFIG_SKIP -split '[,\s]+') | Where-Object { $_ })
+    function Test-Skipped($name) {
+        foreach ($part in @($name) + ($name -split '\.')) { if ($Skip -contains $part) { return $true } }
+        return $false
+    }
+
     function Install-WingetPackage($id) {
+        if (Test-Skipped $id) { Write-Skip "$id (CONFIG_SKIP)"; return }
         winget list --id $id --exact --accept-source-agreements --disable-interactivity *> $null
         if ($LASTEXITCODE -eq 0) { Write-Skip "$id (already installed)"; return }
         for ($i = 1; $i -le $Attempts; $i++) {
@@ -291,6 +304,7 @@ function Install-Config {
     foreach ($p in $packages) { Install-WingetPackage $p }
 
     $docker = $env:CONFIG_DOCKER
+    if (Test-Skipped 'Docker.DockerDesktop') { $docker = '0' }
     if ($docker -ne '0' -and $docker -ne '1') {
         $answer = Read-Host '    Install Docker Desktop? It needs WSL2 and a restart afterwards. [y/N]'
         $docker = if ($answer -match '^(y|j)') { '1' } else { '0' }
@@ -334,7 +348,9 @@ function Install-Config {
                 Write-Skip "npm global folder already on PATH"
             }
         }
-        if (Test-Command 'agent-browser') {
+        if (Test-Skipped 'agent-browser') {
+            Write-Skip 'agent-browser (CONFIG_SKIP)'
+        } elseif (Test-Command 'agent-browser') {
             Write-Skip 'agent-browser (already installed)'
         } else {
             & npm install -g agent-browser
@@ -346,10 +362,13 @@ function Install-Config {
     # ---------------------------------------------------------------- 6. Claude Code + herdr
 
     Write-Step 'Claude Code and herdr'
-    if (Test-Command 'claude') { Write-Skip 'Claude Code (already installed)' }
+    if (Test-Skipped 'claude') { Write-Skip 'Claude Code (CONFIG_SKIP)' }
+    elseif (Test-Command 'claude') { Write-Skip 'Claude Code (already installed)' }
     else { Invoke-RemoteInstaller 'Claude Code' 'https://claude.ai/install.ps1'; Update-SessionPath }
 
-    if ($arch -ne 'X64') {
+    if (Test-Skipped 'herdr') {
+        Write-Skip 'herdr (CONFIG_SKIP)'
+    } elseif ($arch -ne 'X64') {
         Write-Skip "herdr (needs an x86_64 PC; this one is $arch)"
     } elseif (Test-Herdr) {
         Write-Skip 'herdr (already installed)'
@@ -584,11 +603,21 @@ if (Test-Cmd bat) {
 
     Write-Step 'Check'
     Update-SessionPath
-    $tools = 'pwsh','git','gh','node','npm','gitleaks','starship','tailscale','eza','lsd','bat','fzf','mise','zoxide','yazi','fd','rg','agent-browser','claude'
-    foreach ($t in $tools) {
-        if (Test-Command $t) { Write-Ok $t } else { Write-Fail "$t not found on PATH" }
+    # Command -> what it was installed as, so skipped programs aren't reported.
+    $tools = [ordered]@{
+        'pwsh' = 'Microsoft.PowerShell'; 'git' = 'Git.Git'; 'gh' = 'GitHub.cli'
+        'node' = 'OpenJS.NodeJS.LTS'; 'npm' = 'OpenJS.NodeJS.LTS'; 'gitleaks' = 'Gitleaks.Gitleaks'
+        'starship' = 'Starship.Starship'; 'tailscale' = 'Tailscale.Tailscale'; 'eza' = 'eza-community.eza'
+        'lsd' = 'lsd-rs.lsd'; 'bat' = 'sharkdp.bat'; 'fzf' = 'junegunn.fzf'; 'mise' = 'jdx.mise'
+        'zoxide' = 'ajeetdsouza.zoxide'; 'yazi' = 'sxyazi.yazi'; 'fd' = 'sharkdp.fd'
+        'rg' = 'BurntSushi.ripgrep.MSVC'; 'agent-browser' = 'agent-browser'; 'claude' = 'claude'
     }
-    if ($arch -eq 'X64') {
+    foreach ($t in $tools.Keys) {
+        if (Test-Skipped $tools[$t]) { Write-Skip "$t (CONFIG_SKIP)" }
+        elseif (Test-Command $t) { Write-Ok $t }
+        else { Write-Fail "$t not found on PATH" }
+    }
+    if ($arch -eq 'X64' -and -not (Test-Skipped 'herdr')) {
         if (Test-Herdr) { Write-Ok 'herdr' } else { Write-Fail 'herdr not found (no hc command or Start menu shortcut)' }
     }
 

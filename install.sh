@@ -17,6 +17,9 @@
 #     CONFIG_DOCKER=1   install Docker Engine without asking
 #     CONFIG_DOCKER=0   skip Docker Engine without asking
 #     CONFIG_CLAUDE=0   skip Claude Code (for machines where it isn't allowed)
+#     CONFIG_SKIP="yazi herdr"
+#                       don't install these programs: names from the Brewfile,
+#                       plus claude, docker and tailscale
 #     CONFIG_DIR=...    where to clone the repo (default: ~/config)
 
 # Everything is inside main(), so a partly downloaded script never runs.
@@ -163,7 +166,18 @@ main() {
     SUDO_KEEPER=$!
     trap 'kill "$SUDO_KEEPER" 2>/dev/null' EXIT
 
+    # CONFIG_SKIP: space- or comma-separated names. Brewfile formulae are passed
+    # on to brew bundle, which skips them itself.
+    local skip_list
+    skip_list=" $(printf '%s' "${CONFIG_SKIP:-}" | tr ',' ' ' | tr -s ' ') "
+    skipped() { [[ "$skip_list" == *" $1 "* ]]; }
+    if [ -n "${CONFIG_SKIP:-}" ]; then
+        export HOMEBREW_BUNDLE_BREW_SKIP="${skip_list# }"
+        echo "Skipping: ${skip_list# }"
+    fi
+
     local docker="${CONFIG_DOCKER:-}"
+    skipped docker && docker=0
     if [ "$docker" != 0 ] && [ "$docker" != 1 ]; then
         if have docker; then docker=0
         elif ask 'Install Docker Engine (docker, buildx, compose)?'; then docker=1
@@ -246,8 +260,9 @@ main() {
     # Optional: a failure is only a warning, because some managed machines block it.
     step 'Claude Code (optional)'
     local claude="${CONFIG_CLAUDE:-1}"
+    skipped claude && claude=0
     if [ "$claude" = 0 ]; then
-        skip 'CONFIG_CLAUDE=0'
+        skip 'not selected (CONFIG_SKIP / CONFIG_CLAUDE=0)'
     elif have claude || [ -x "$HOME/.local/bin/claude" ]; then
         skip 'already installed'
     elif retry run_remote https://claude.ai/install.sh bash; then
@@ -396,14 +411,16 @@ function y() {
   rm -f -- "$tmp"
 }
 
-# Aliases (same as macOS)
-alias ls='lsd'
-alias l='lsd -l'
-alias la='lsd -a'
-alias lsa='lsd -a'
-alias lla='lsd -la'
-alias lt='lsd --tree'
-alias cat='bat --paging=never'
+# Aliases (same as macOS; only if the program is installed)
+if command -v lsd >/dev/null; then
+  alias ls='lsd'
+  alias l='lsd -l'
+  alias la='lsd -a'
+  alias lsa='lsd -a'
+  alias lla='lsd -la'
+  alias lt='lsd --tree'
+fi
+command -v bat >/dev/null && alias cat='bat --paging=never'
 
 # Syntax highlighting (must be sourced last)
 [ -f "${HOMEBREW_PREFIX:-}/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ] &&
@@ -462,7 +479,9 @@ EOF
     # ------------------------------------------------------------ 11. Tailscale (last)
 
     step 'Tailscale (installed last because it can briefly cut the internet connection)'
-    if have tailscale; then
+    if skipped tailscale; then
+        skip 'not selected (CONFIG_SKIP)'
+    elif have tailscale; then
         skip 'already installed'
     elif retry run_remote https://tailscale.com/install.sh sh; then
         ok 'Tailscale'
@@ -480,7 +499,12 @@ EOF
     local tools=(zsh git gh git-lfs gitleaks starship eza lsd bat fd rg mise zoxide yazi agent-browser herdr tailscale) t
     [ "$docker" = 1 ] && tools+=(docker)
     for t in "${tools[@]}"; do
-        if have "$t"; then ok "$t"; else fail "$t not found on PATH"; fi
+        # Command name -> Brewfile name, where they differ.
+        local name="$t"
+        [ "$t" = rg ] && name=ripgrep
+        if skipped "$name"; then skip "$t (CONFIG_SKIP)"
+        elif have "$t"; then ok "$t"
+        else fail "$t not found on PATH"; fi
     done
     if [ "$claude" != 0 ]; then
         if have claude; then ok 'claude'; else warn 'claude not found (optional)'; fi

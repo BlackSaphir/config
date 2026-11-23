@@ -1,6 +1,7 @@
 # config
 
-Terminal and CLI setup for macOS and Windows.
+Terminal and CLI setup for macOS, Ubuntu and Windows. To leave out programs
+you don't want, see [Leaving out programs](#leaving-out-programs).
 
 ## macOS
 
@@ -326,3 +327,49 @@ Reload with `. $PROFILE`. To check every tool, see
 | colima | Docker Desktop |
 | mole | none |
 | zsh-autosuggestions / zsh-syntax-highlighting | PSReadLine (step 5), or zsh inside WSL |
+
+## Leaving out programs
+
+Each OS takes a list of programs to skip. Names are separated by spaces.
+Programs that are already installed stay installed.
+
+### macOS
+
+`brew bundle` reads two variables: one for formulae and one for casks. Use the
+names from the `Brewfile`:
+
+```sh
+HOMEBREW_BUNDLE_BREW_SKIP="mole colima" HOMEBREW_BUNDLE_CASK_SKIP="iterm2" brew bundle --file=Brewfile
+```
+
+If you leave out `lsd`, `bat`, `starship`, `zoxide` or `mise`, also leave out
+their lines in `~/.zshrc`.
+
+### Ubuntu
+
+Put `CONFIG_SKIP` in front of `bash`:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/BlackSaphir/config/main/install.sh | CONFIG_SKIP="yazi herdr tailscale" bash
+```
+
+Names: the formulae in the `Brewfile` (for example `ripgrep`, not `rg`), plus
+`claude`, `docker` and `tailscale`. The `~/.zshrc` block only sets up what is
+installed. For the manual install, use `HOMEBREW_BUNDLE_BREW_SKIP` as on macOS.
+
+### Windows
+
+Set `CONFIG_SKIP` in the same window before running the script:
+
+```powershell
+$env:CONFIG_SKIP = 'yazi herdr Tailscale'
+irm https://raw.githubusercontent.com/BlackSaphir/config/main/install.ps1 | iex
+```
+
+Names: a winget ID (`GitHub.cli`) or one part of it (`yazi`, `ripgrep`,
+`Tailscale`, `DockerDesktop`), plus `agent-browser`, `claude` and `herdr`. Case
+doesn't matter. The PowerShell profile only sets up what is installed. The
+variable lasts until you close the window, or remove it with
+`Remove-Item Env:CONFIG_SKIP`.
+
+For the manual install, leave the IDs out of the `winget install` commands.
