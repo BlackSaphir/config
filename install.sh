@@ -27,6 +27,14 @@ main() {
     local stamp; stamp="$(date +%Y%m%d-%H%M%S)"
     local failures=() notes=()
 
+    # LD_PRELOAD entries with $LIB in the path can't be resolved by Homebrew's
+    # own glibc, which then prints an ld.so error for every Homebrew program.
+    # Drop those entries for this script.
+    if [[ "${LD_PRELOAD:-}" == *'$LIB'* ]]; then
+        LD_PRELOAD="$(tr ': ' '\n\n' <<< "$LD_PRELOAD" | grep -v -F -e '$LIB' | grep -v '^$' | paste -sd: - || true)"
+        if [ -n "$LD_PRELOAD" ]; then export LD_PRELOAD; else unset LD_PRELOAD; fi
+    fi
+
     # ------------------------------------------------------------ helpers
 
     step() { printf '\n\033[36m==> %s\033[0m\n' "$1"; }
@@ -288,31 +296,35 @@ main() {
 
     step 'Terminal font (Ptyxis / GNOME Terminal)'
     local font='Hack Nerd Font 12' configured=0
-    if ! have gsettings || ! gsettings list-schemas >/dev/null 2>&1; then
+    # Use the system gsettings: Homebrew's (pulled in as a dependency) only
+    # knows Homebrew's schemas and says "No schemas installed".
+    local gs=/usr/bin/gsettings
+    [ -x "$gs" ] || gs="$(command -v gsettings || true)"
+    if [ -z "$gs" ] || ! "$gs" list-schemas >/dev/null 2>&1; then
         warn 'gsettings is not available (no desktop session, e.g. over SSH). Run the script again in the desktop.'
         notes+=('Terminal font: run the script again inside the Ubuntu desktop to set it.')
     else
-        local schemas; schemas="$(gsettings list-schemas 2>/dev/null)"
+        local schemas; schemas="$("$gs" list-schemas 2>/dev/null)"
         if grep -qx 'org.gnome.Ptyxis' <<< "$schemas"; then
             configured=1
-            if [ "$(gsettings get org.gnome.Ptyxis font-name)" = "'$font'" ] && [ "$(gsettings get org.gnome.Ptyxis use-system-font)" = false ]; then
+            if [ "$("$gs" get org.gnome.Ptyxis font-name)" = "'$font'" ] && [ "$("$gs" get org.gnome.Ptyxis use-system-font)" = false ]; then
                 skip 'Ptyxis already uses Hack Nerd Font'
             else
-                gsettings set org.gnome.Ptyxis use-system-font false \
-                    && gsettings set org.gnome.Ptyxis font-name "$font" \
+                "$gs" set org.gnome.Ptyxis use-system-font false \
+                    && "$gs" set org.gnome.Ptyxis font-name "$font" \
                     && ok "Ptyxis font = $font" || fail 'Setting the Ptyxis font'
             fi
         fi
         if grep -qx 'org.gnome.Terminal.ProfilesList' <<< "$schemas"; then
             configured=1
             local uuid path
-            uuid="$(gsettings get org.gnome.Terminal.ProfilesList default | tr -d "'")"
+            uuid="$("$gs" get org.gnome.Terminal.ProfilesList default | tr -d "'")"
             path="org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$uuid/"
-            if [ "$(gsettings get "$path" font)" = "'$font'" ] && [ "$(gsettings get "$path" use-system-font)" = false ]; then
+            if [ "$("$gs" get "$path" font)" = "'$font'" ] && [ "$("$gs" get "$path" use-system-font)" = false ]; then
                 skip 'GNOME Terminal already uses Hack Nerd Font'
             else
-                gsettings set "$path" use-system-font false \
-                    && gsettings set "$path" font "$font" \
+                "$gs" set "$path" use-system-font false \
+                    && "$gs" set "$path" font "$font" \
                     && ok "GNOME Terminal font = $font" || fail 'Setting the GNOME Terminal font'
             fi
         fi
@@ -333,6 +345,17 @@ main() {
 # >>> BlackSaphir/config >>>
 # Managed by install.sh from github.com/BlackSaphir/config.
 # Running the script again replaces everything between these two markers.
+
+# LD_PRELOAD entries with $LIB in the path can't be resolved by Homebrew's own
+# glibc, which then prints an ld.so error for every Homebrew program. Drop
+# those entries in this shell. Must run before anything from Homebrew.
+if [[ "${LD_PRELOAD:-}" == *'$LIB'* ]]; then
+  () {
+    local -a parts=(${=${LD_PRELOAD//:/ }})
+    parts=(${parts:#*\$LIB*})
+    if (( $#parts )); then export LD_PRELOAD="${(j.:.)parts}"; else unset LD_PRELOAD; fi
+  }
+fi
 
 # Homebrew, and ~/.local/bin (Claude Code)
 if [ -x /home/linuxbrew/.linuxbrew/bin/brew ]; then
@@ -389,6 +412,19 @@ alias cat='bat --paging=never'
 EOF
     block="${block%$'\n'}"
     write_block "$zshrc" "$block" bottom
+
+    # Lines copied by hand from the README (outside the block) run before
+    # Homebrew is loaded and fail with "command not found".
+    local dupes
+    dupes="$(awk '/^# >>> BlackSaphir\/config >>>$/{skip=1}
+        !skip && /^[^#]*(brew --prefix|starship init|zoxide init|mise activate|zsh-autosuggestions|zsh-syntax-highlighting)/ { print "          line " NR ": " $0 }
+        /^# <<< BlackSaphir\/config <<</{skip=0}' "$zshrc")"
+    if [ -n "$dupes" ]; then
+        warn "$zshrc has lines outside the managed block that the block already does:"
+        printf '%s\n' "$dupes"
+        warn 'Remove them (the block covers them), or they fail with "command not found" when zsh starts.'
+        notes+=("zsh: remove the duplicated lines from $zshrc (see the warning above).")
+    fi
 
     # Use the apt zsh (it is in /etc/shells), not one from Homebrew.
     local zsh_path=/usr/bin/zsh

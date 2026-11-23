@@ -10,6 +10,9 @@ install steps, see the [README](README.md).
   - [`chsh`: "user … does not exist in /etc/passwd"](#chsh-user--does-not-exist-in-etcpasswd)
   - [Starship: "Unknown key" warnings](#starship-unknown-key-warnings)
   - [Claude Code doesn't install](#claude-code-doesnt-install)
+  - [ld.so: "… from LD_PRELOAD cannot be preloaded"](#ldso--from-ld_preload-cannot-be-preloaded)
+  - [gsettings: "No schemas installed"](#gsettings-no-schemas-installed)
+  - [zsh start: "command not found: brew"](#zsh-start-command-not-found-brew)
   - [setopt: "Command 'setopt' not found"](#setopt-command-setopt-not-found)
 - [Windows](#windows)
   - [Prerequisites](#prerequisites)
@@ -102,6 +105,37 @@ everything else. Skip it entirely with:
 ```sh
 curl -fsSL https://raw.githubusercontent.com/BlackSaphir/config/main/install.sh | CONFIG_CLAUDE=0 bash
 ```
+
+### ld.so: "… from LD_PRELOAD cannot be preloaded"
+
+```
+ERROR: ld.so: object '/usr/$LIB/<library>.so' from LD_PRELOAD cannot be preloaded (cannot open shared object file): ignored.
+```
+
+**Problem:** appears for every Homebrew program. `LD_PRELOAD` contains a path
+with `$LIB`. Homebrew sometimes brings its own glibc
+(`/home/linuxbrew/.linuxbrew/opt/glibc`), whose loader resolves `$LIB` to a
+different folder than Ubuntu's and doesn't find the file.
+
+**Fix:** the `~/.zshrc` block from `install.sh` removes the `LD_PRELOAD` entries
+that contain `$LIB`, before anything from Homebrew runs.
+
+### gsettings: "No schemas installed"
+
+**Cause:** Homebrew installed its own `gsettings` (as a dependency), which is
+first on `PATH` and only knows Homebrew's schemas.
+
+**Fix:** use the system one: `/usr/bin/gsettings`. `install.sh` does this.
+
+### zsh start: "command not found: brew"
+
+Often followed by `no such file or directory: /share/zsh-autosuggestions/...`.
+
+**Cause:** `~/.zshrc` still has the macOS lines copied from the README above the
+block that `install.sh` wrote. They run before Homebrew is loaded.
+
+**Fix:** remove them; the block already does the same. `install.sh` lists them
+with their line numbers.
 
 ### setopt: "Command 'setopt' not found"
 
