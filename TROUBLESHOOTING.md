@@ -11,6 +11,7 @@ install steps, see the [README](README.md).
   - [zip packages fail with "Failed to extract archive"](#zip-packages-fail-with-failed-to-extract-archive)
   - [`agent-browser` is "not recognized" after `npm install -g`](#agent-browser-is-not-recognized-after-npm-install--g)
   - [Install scripts fail](#install-scripts-fail)
+  - [Downloads fail with 0x80072EE7 ("server name could not be resolved")](#downloads-fail-with-0x80072ee7-server-name-could-not-be-resolved)
   - [Installing without Scoop](#installing-without-scoop)
   - [`Set-ExecutionPolicy`: "overridden by a policy defined at a more specific scope"](#set-executionpolicy-overridden-by-a-policy-defined-at-a-more-specific-scope)
   - [PSReadLine: "The predictive suggestion feature cannot be enabled…"](#psreadline-the-predictive-suggestion-feature-cannot-be-enabled)
@@ -162,6 +163,15 @@ script and runs it immediately. They need:
 - a **normal (non-admin)** PowerShell window. Scoop refuses to install from an
   admin shell.
 - herdr only: an x86_64 PC
+
+### Downloads fail with 0x80072EE7 ("server name could not be resolved")
+
+**Cause:** installing Tailscale can briefly cut the internet connection. Every
+download after that point fails.
+
+**Fix:** `install.ps1` installs Tailscale last and retries each download once
+after the network is back. If something still fails, run the script again; it
+only installs what's missing.
 
 ### Installing without Scoop
 

@@ -81,32 +81,133 @@ function Install-Config {
         if ($LocalRepo) {
             Copy-Item (Join-Path $LocalRepo $relPath) $dest -Force
         } else {
-            Invoke-WebRequest "$RepoRaw/$($relPath -replace '\\','/')" -OutFile $dest -UseBasicParsing -ErrorAction Stop
+            Save-Url "$RepoRaw/$($relPath -replace '\\','/')" $dest
         }
     }
+
+    # Waits until DNS works again (for example after a VPN or Tailscale changed
+    # the network). Returns $false if it still fails after $seconds.
+    function Wait-Network($seconds = 60) {
+        $deadline = (Get-Date).AddSeconds($seconds)
+        while ((Get-Date) -lt $deadline) {
+            try { [Net.Dns]::GetHostAddresses('github.com') | Out-Null; return $true } catch { Start-Sleep -Seconds 3 }
+        }
+        return $false
+    }
+
+    # Every download is tried twice. Before the second try the script waits for
+    # the network, so a short outage doesn't fail the whole run.
+    $Attempts = 2
 
     function Install-WingetPackage($id) {
         winget list --id $id --exact --accept-source-agreements --disable-interactivity *> $null
         if ($LASTEXITCODE -eq 0) { Write-Skip "$id (already installed)"; return }
-        Write-Host "    ...   installing $id"
-        winget install --id $id --exact --silent --accept-package-agreements --accept-source-agreements --disable-interactivity
-        if ($LASTEXITCODE -eq 0) { Write-Ok $id }
-        else { Write-Fail "$id (winget exit code $LASTEXITCODE)" }
+        for ($i = 1; $i -le $Attempts; $i++) {
+            Write-Host "    ...   installing $id"
+            winget install --id $id --exact --silent --accept-package-agreements --accept-source-agreements --disable-interactivity
+            $code = $LASTEXITCODE
+            if ($code -eq 0) { Write-Ok $id; return }
+            if ($i -lt $Attempts) { Write-Warn "$id failed (winget exit code $code); waiting for the network, then trying again"; Wait-Network | Out-Null }
+        }
+        Write-Fail "$id (winget exit code $code)"
+    }
+
+    function Save-Url($url, $outFile) {
+        for ($i = 1; $i -le $Attempts; $i++) {
+            try { Invoke-WebRequest $url -OutFile $outFile -UseBasicParsing -ErrorAction Stop; return }
+            catch {
+                if ($i -ge $Attempts) { throw }
+                Write-Warn "Download failed ($($_.Exception.Message)); waiting for the network, then trying again"
+                Wait-Network | Out-Null
+            }
+        }
     }
 
     # Runs PowerShell code in a separate process. The code is passed base64-encoded
     # because Windows PowerShell 5.1 mangles quotes in arguments to programs.
+    # Hiding progress and using text output keeps the child from writing CLIXML
+    # when the output is redirected.
     function Invoke-Encoded($exe, $code) {
+        $code = "`$ProgressPreference = 'SilentlyContinue'`n" + $code
         $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($code))
-        & $exe -NoProfile -ExecutionPolicy Bypass -EncodedCommand $encoded
+        & $exe -NoProfile -ExecutionPolicy Bypass -OutputFormat Text -EncodedCommand $encoded
     }
 
     # Runs a vendor install script in a separate process, so an `exit` inside it
     # can't close this window.
     function Invoke-RemoteInstaller($name, $url) {
-        Write-Host "    ...   installing $name"
-        Invoke-Encoded 'powershell' "irm '$url' | iex"
-        if ($LASTEXITCODE -eq 0) { Write-Ok $name } else { Write-Fail "$name (installer exit code $LASTEXITCODE)" }
+        for ($i = 1; $i -le $Attempts; $i++) {
+            Write-Host "    ...   installing $name"
+            Invoke-Encoded 'powershell' "irm '$url' | iex"
+            $code = $LASTEXITCODE
+            if ($code -eq 0) { Write-Ok $name; return }
+            if ($i -lt $Attempts) { Write-Warn "$name failed (exit code $code); waiting for the network, then trying again"; Wait-Network | Out-Null }
+        }
+        Write-Fail "$name (installer exit code $code)"
+    }
+
+    # herdr installs `hc` (its CLI) and a Start menu shortcut; `herdr` may not be on PATH.
+    function Test-Herdr {
+        if ((Test-Command 'herdr') -or (Test-Command 'hc')) { return $true }
+        [bool](Get-ChildItem (Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs') -Recurse -Filter '*herdr*' -ErrorAction SilentlyContinue)
+    }
+
+    # True if a font file is both registered (per-user or system-wide) and present.
+    # A file without a registry entry is not usable by Windows Terminal.
+    function Test-FontRegistered($fileName) {
+        $keys = 'HKCU:\Software\Microsoft\Windows NT\CurrentVersion\Fonts', 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts'
+        foreach ($key in $keys) {
+            $props = Get-ItemProperty $key -ErrorAction SilentlyContinue
+            if (-not $props) { continue }
+            foreach ($p in $props.PSObject.Properties) {
+                if ($p.Name -in 'PSPath','PSParentPath','PSChildName','PSDrive','PSProvider') { continue }
+                $data = [string]$p.Value
+                if (-not $data -or (Split-Path $data -Leaf) -ne $fileName) { continue }
+                $full = if ([IO.Path]::IsPathRooted($data)) { $data } else { Join-Path $env:WINDIR "Fonts\$data" }
+                if (Test-Path $full) { return $true }
+            }
+        }
+        return $false
+    }
+
+    # ConvertTo-Json in Windows PowerShell 5.1 indents oddly. This re-indents
+    # compact JSON with 4 spaces, like Windows Terminal writes it.
+    function Format-Json($json) {
+        $sb = New-Object Text.StringBuilder
+        $level = 0; $inString = $false; $escaped = $false
+        $chars = $json.ToCharArray()
+        for ($i = 0; $i -lt $chars.Length; $i++) {
+            $c = $chars[$i]
+            if ($inString) {
+                [void]$sb.Append($c)
+                if ($escaped) { $escaped = $false }
+                elseif ($c -eq [char]'\') { $escaped = $true }
+                elseif ($c -eq [char]'"') { $inString = $false }
+                continue
+            }
+            if ($c -eq [char]'"') { $inString = $true; [void]$sb.Append($c) }
+            elseif ($c -eq [char]'{' -or $c -eq [char]'[') {
+                $next = if ($i + 1 -lt $chars.Length) { $chars[$i + 1] } else { [char]0 }
+                if (($c -eq [char]'{' -and $next -eq [char]'}') -or ($c -eq [char]'[' -and $next -eq [char]']')) {
+                    [void]$sb.Append($c).Append($next); $i++
+                } else {
+                    $level++
+                    [void]$sb.Append($c).Append("`n").Append('    ' * $level)
+                }
+            }
+            elseif ($c -eq [char]'}' -or $c -eq [char]']') {
+                $level--
+                [void]$sb.Append("`n").Append('    ' * $level).Append($c)
+            }
+            elseif ($c -eq [char]',') { [void]$sb.Append(",`n").Append('    ' * $level) }
+            elseif ($c -eq [char]':') { [void]$sb.Append(': ') }
+            elseif (-not [char]::IsWhiteSpace($c)) { [void]$sb.Append($c) }
+        }
+        return $sb.ToString() + "`n"
+    }
+
+    function Write-Json($path, $obj) {
+        Write-Utf8NoBom $path (Format-Json ($obj | ConvertTo-Json -Depth 32 -Compress))
     }
 
     # ---------------------------------------------------------------- checks
@@ -160,12 +261,14 @@ function Install-Config {
         Set-JsonProperty $wg '$schema' 'https://aka.ms/winget-settings.schema.json'
         if (-not $wg.PSObject.Properties['installBehavior']) { Set-JsonProperty $wg 'installBehavior' ([pscustomobject]@{}) }
         Set-JsonProperty $wg.installBehavior 'archiveExtractionMethod' 'tar'
-        Write-Utf8NoBom $wgSettings ($wg | ConvertTo-Json -Depth 32)
+        Write-Json $wgSettings $wg
         Write-Ok 'archiveExtractionMethod = tar'
     }
 
     # ---------------------------------------------------------------- 3. winget packages
 
+    # Tailscale is installed at the very end: installing it briefly interrupts
+    # the network, which made every download after it fail.
     Write-Step 'Installing packages with winget'
     $packages = @(
         'Microsoft.PowerShell',
@@ -175,7 +278,6 @@ function Install-Config {
         'OpenJS.NodeJS.LTS',
         'Gitleaks.Gitleaks',
         'Starship.Starship',
-        'Tailscale.Tailscale',
         'eza-community.eza',
         'lsd-rs.lsd',
         'sharkdp.bat',
@@ -247,10 +349,9 @@ function Install-Config {
     if (Test-Command 'claude') { Write-Skip 'Claude Code (already installed)' }
     else { Invoke-RemoteInstaller 'Claude Code' 'https://claude.ai/install.ps1'; Update-SessionPath }
 
-    $herdrShortcut = Get-ChildItem (Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs') -Recurse -Filter '*herdr*' -ErrorAction SilentlyContinue
     if ($arch -ne 'X64') {
         Write-Skip "herdr (needs an x86_64 PC; this one is $arch)"
-    } elseif ((Test-Command 'herdr') -or $herdrShortcut) {
+    } elseif (Test-Herdr) {
         Write-Skip 'herdr (already installed)'
     } else {
         Invoke-RemoteInstaller 'herdr' 'https://releases.herdr.dev/app/install.ps1'
@@ -260,14 +361,13 @@ function Install-Config {
 
     Write-Step 'Hack Nerd Font'
     $userFonts = Join-Path $env:LOCALAPPDATA 'Microsoft\Windows\Fonts'
-    $fontInstalled = (Test-Path (Join-Path $userFonts 'HackNerdFont-Regular.ttf')) -or (Test-Path (Join-Path $env:WINDIR 'Fonts\HackNerdFont-Regular.ttf'))
-    if ($fontInstalled) {
+    if (Test-FontRegistered 'HackNerdFont-Regular.ttf') {
         Write-Skip 'already installed'
     } else {
         $tmp = Join-Path $env:TEMP "hack-nerd-font-$Stamp"
         try {
             New-Item -ItemType Directory -Force $tmp | Out-Null
-            Invoke-WebRequest 'https://github.com/ryanoasis/nerd-fonts/releases/latest/download/Hack.zip' -OutFile "$tmp\Hack.zip" -UseBasicParsing -ErrorAction Stop
+            Save-Url 'https://github.com/ryanoasis/nerd-fonts/releases/latest/download/Hack.zip' "$tmp\Hack.zip"
             Expand-Archive "$tmp\Hack.zip" -DestinationPath "$tmp\Hack" -Force -ErrorAction Stop
             New-Item -ItemType Directory -Force $userFonts | Out-Null
             $regKey = 'HKCU:\Software\Microsoft\Windows NT\CurrentVersion\Fonts'
@@ -275,7 +375,8 @@ function Install-Config {
             $fonts = Get-ChildItem "$tmp\Hack" -Filter 'HackNerdFont-*.ttf'
             foreach ($f in $fonts) {
                 $target = Join-Path $userFonts $f.Name
-                Copy-Item $f.FullName $target -Force
+                # A file that is already there may be in use; then only the registry entry is missing.
+                if (-not (Test-Path $target)) { Copy-Item $f.FullName $target -Force -ErrorAction Stop }
                 New-ItemProperty -Path $regKey -Name "$($f.BaseName) (TrueType)" -Value $target -PropertyType String -Force | Out-Null
             }
             Write-Ok "$($fonts.Count) font files installed for this user"
@@ -330,7 +431,7 @@ function Install-Config {
             }
             if ($changed) {
                 $bak = Backup-File $wtSettings
-                Write-Utf8NoBom $wtSettings ($wt | ConvertTo-Json -Depth 32)
+                Write-Json $wtSettings $wt
                 Write-Host "          backup: $bak" -ForegroundColor DarkGray
             }
         }
@@ -377,12 +478,20 @@ function Install-Config {
 $failed = $false
 foreach ($m in 'PSFzf', 'Terminal-Icons') {
     if (Get-Module -ListAvailable $m) { Write-Host "    skip  $m (already installed)" -ForegroundColor DarkGray; continue }
-    try {
-        Install-Module $m -Scope CurrentUser -Force -AllowClobber -ErrorAction Stop
-        Write-Host "    ok    $m" -ForegroundColor Green
-    } catch {
-        Write-Host "    FAIL  $m : $($_.Exception.Message)" -ForegroundColor Red
-        $failed = $true
+    for ($i = 1; $i -le 2; $i++) {
+        try {
+            Install-Module $m -Scope CurrentUser -Force -AllowClobber -ErrorAction Stop
+            Write-Host "    ok    $m" -ForegroundColor Green
+            break
+        } catch {
+            if ($i -lt 2) {
+                Write-Host "    warn  $m failed; trying again in 20 seconds" -ForegroundColor Yellow
+                Start-Sleep -Seconds 20
+            } else {
+                Write-Host "    FAIL  $m : $($_.Exception.Message)" -ForegroundColor Red
+                $failed = $true
+            }
+        }
     }
 }
 if ($failed) { exit 1 }
@@ -466,13 +575,21 @@ if (Test-Cmd bat) {
         }
     }
 
-    # ---------------------------------------------------------------- 11. check
+    # ---------------------------------------------------------------- 11. Tailscale (last)
+
+    Write-Step 'Tailscale (installed last because it briefly interrupts the network)'
+    Install-WingetPackage 'Tailscale.Tailscale'
+
+    # ---------------------------------------------------------------- 12. check
 
     Write-Step 'Check'
     Update-SessionPath
     $tools = 'pwsh','git','gh','node','npm','gitleaks','starship','tailscale','eza','lsd','bat','fzf','mise','zoxide','yazi','fd','rg','agent-browser','claude'
     foreach ($t in $tools) {
         if (Test-Command $t) { Write-Ok $t } else { Write-Fail "$t not found on PATH" }
+    }
+    if ($arch -eq 'X64') {
+        if (Test-Herdr) { Write-Ok 'herdr' } else { Write-Fail 'herdr not found (no hc command or Start menu shortcut)' }
     }
 
     # ---------------------------------------------------------------- summary
