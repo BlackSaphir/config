@@ -13,7 +13,7 @@ cd config
 brew bundle --file=Brewfile
 ```
 
-This also installs **iTerm2** and **Hack Nerd Font**, which provides the icons used by `lsd`.
+This also installs **iTerm2**, **Bitwarden** and **Hack Nerd Font**, which provides the icons used by `lsd`.
 
 If iTerm2 "already exists", see
 [TROUBLESHOOTING.md](TROUBLESHOOTING.md#brew-bundle-iterm2-already-exists).
@@ -102,7 +102,7 @@ alias la='lsd -a'
 alias lsa='lsd -a'
 alias lla='lsd -la'
 alias lt='lsd --tree'
-alias cat='bat --paging=never'
+alias cat='bat -pp'
 
 # Syntax highlighting (must be sourced last)
 source $(brew --prefix)/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
@@ -130,6 +130,7 @@ curl -fsSL https://raw.githubusercontent.com/BlackSaphir/config/main/install.sh 
 - installs Homebrew and everything in the `Brewfile`
 - installs Claude Code, Tailscale and, if you want it, Docker Engine with their
   official installers
+- installs the Bitwarden desktop app with `snap`
 - installs Hack Nerd Font to `~/.local/share/fonts`
 - sets the font in Ptyxis or GNOME Terminal
 - symlinks the Starship and yazi configs
@@ -150,6 +151,7 @@ cd ~/config
 brew bundle --file=Brewfile
 curl -fsSL https://claude.ai/install.sh | bash        # Claude Code
 curl -fsSL https://tailscale.com/install.sh | sh      # Tailscale
+sudo snap install bitwarden                           # Bitwarden
 ```
 
 The `Brewfile` skips the macOS-only entries (casks, colima, mole) on Linux. For
@@ -239,8 +241,8 @@ Without this, zip-based tools fail on some PCs
 #### 3. Install the tools
 
 ```powershell
-winget install Git.Git GitHub.cli OpenJS.NodeJS.LTS Gitleaks.Gitleaks Starship.Starship Tailscale.Tailscale Docker.DockerDesktop
-winget install eza-community.eza lsd-rs.lsd sharkdp.bat junegunn.fzf jdx.mise ajeetdsouza.zoxide sxyazi.yazi sharkdp.fd BurntSushi.ripgrep.MSVC
+winget install Git.Git GitHub.cli OpenJS.NodeJS.LTS Gitleaks.Gitleaks Starship.Starship Tailscale.Tailscale Docker.DockerDesktop Amazon.AWSCLI Bitwarden.Bitwarden
+winget install eza-community.eza lsd-rs.lsd sharkdp.bat junegunn.fzf jdx.mise ajeetdsouza.zoxide sxyazi.yazi sharkdp.fd BurntSushi.ripgrep.MSVC JesseDuffield.lazygit
 
 [Environment]::SetEnvironmentVariable("YAZI_FILE_ONE", "C:\Program Files\Git\usr\bin\file.exe", "User")
 ```
@@ -314,7 +316,7 @@ function la  { lsd -a @args }
 function lsa { lsd -a @args }
 function lla { lsd -la @args }
 function lt  { lsd --tree @args }
-function cat { bat --paging=never @args }
+function cat { bat -pp @args }
 ```
 
 Reload with `. $PROFILE`. To check every tool, see
@@ -354,7 +356,7 @@ curl -fsSL https://raw.githubusercontent.com/BlackSaphir/config/main/install.sh 
 ```
 
 Names: the formulae in the `Brewfile` (for example `ripgrep`, not `rg`), plus
-`claude`, `docker` and `tailscale`. The `~/.zshrc` block only sets up what is
+`bitwarden`, `claude`, `docker` and `tailscale`. The `~/.zshrc` block only sets up what is
 installed. For the manual install, use `HOMEBREW_BUNDLE_BREW_SKIP` as on macOS.
 
 ### Windows
@@ -367,7 +369,7 @@ irm https://raw.githubusercontent.com/BlackSaphir/config/main/install.ps1 | iex
 ```
 
 Names: a winget ID (`GitHub.cli`) or one part of it (`yazi`, `ripgrep`,
-`Tailscale`, `DockerDesktop`), plus `agent-browser`, `claude` and `herdr`. Case
+`Tailscale`, `DockerDesktop`, `Bitwarden`), plus `agent-browser`, `claude` and `herdr`. Case
 doesn't matter. The PowerShell profile only sets up what is installed. The
 variable lasts until you close the window, or remove it with
 `Remove-Item Env:CONFIG_SKIP`.

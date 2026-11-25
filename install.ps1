@@ -299,7 +299,10 @@ function Install-Config {
         'ajeetdsouza.zoxide',
         'sxyazi.yazi',
         'sharkdp.fd',
-        'BurntSushi.ripgrep.MSVC'
+        'BurntSushi.ripgrep.MSVC',
+        'JesseDuffield.lazygit',
+        'Amazon.AWSCLI',
+        'Bitwarden.Bitwarden'
     )
     foreach ($p in $packages) { Install-WingetPackage $p }
 
@@ -568,7 +571,7 @@ if (Test-Cmd lsd) {
 }
 if (Test-Cmd bat) {
     Remove-Item Alias:cat -Force -ErrorAction SilentlyContinue
-    function cat { bat --paging=never @args }
+    function cat { bat -pp @args }
 }
 # <<< BlackSaphir/config <<<
 '@
@@ -610,7 +613,8 @@ if (Test-Cmd bat) {
         'starship' = 'Starship.Starship'; 'tailscale' = 'Tailscale.Tailscale'; 'eza' = 'eza-community.eza'
         'lsd' = 'lsd-rs.lsd'; 'bat' = 'sharkdp.bat'; 'fzf' = 'junegunn.fzf'; 'mise' = 'jdx.mise'
         'zoxide' = 'ajeetdsouza.zoxide'; 'yazi' = 'sxyazi.yazi'; 'fd' = 'sharkdp.fd'
-        'rg' = 'BurntSushi.ripgrep.MSVC'; 'agent-browser' = 'agent-browser'; 'claude' = 'claude'
+        'rg' = 'BurntSushi.ripgrep.MSVC'; 'lazygit' = 'JesseDuffield.lazygit'; 'aws' = 'Amazon.AWSCLI'
+        'agent-browser' = 'agent-browser'; 'claude' = 'claude'
     }
     foreach ($t in $tools.Keys) {
         if (Test-Skipped $tools[$t]) { Write-Skip "$t (CONFIG_SKIP)" }

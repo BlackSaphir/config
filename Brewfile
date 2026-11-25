@@ -3,6 +3,7 @@
 
 # Formulae (macOS and Linux)
 brew "agent-browser"
+brew "awscli"
 brew "bat"
 brew "eza"
 brew "fd"
@@ -11,6 +12,7 @@ brew "git"
 brew "git-lfs"
 brew "gitleaks"
 brew "herdr"
+brew "lazygit"
 brew "lsd"
 brew "mise"
 brew "ripgrep"
@@ -21,7 +23,8 @@ brew "zsh-autosuggestions"
 brew "zsh-syntax-highlighting"
 
 # macOS only. On Linux, install.sh installs Docker Engine, Tailscale and
-# Claude Code with their official installers, and the font by hand.
+# Claude Code with their official installers, Bitwarden with snap, and the
+# font by hand.
 if OS.mac?
   brew "colima"
   brew "docker"
@@ -30,6 +33,7 @@ if OS.mac?
   brew "mole"
   brew "tailscale"
 
+  cask "bitwarden"
   cask "claude-code"
   cask "font-hack-nerd-font"
   cask "iterm2"

@@ -19,7 +19,7 @@
 #     CONFIG_CLAUDE=0   skip Claude Code (for machines where it isn't allowed)
 #     CONFIG_SKIP="yazi herdr"
 #                       don't install these programs: names from the Brewfile,
-#                       plus claude, docker and tailscale
+#                       plus bitwarden, claude, docker and tailscale
 #     CONFIG_DIR=...    where to clone the repo (default: ~/config)
 
 # Everything is inside main(), so a partly downloaded script never runs.
@@ -420,7 +420,7 @@ if command -v lsd >/dev/null; then
   alias lla='lsd -la'
   alias lt='lsd --tree'
 fi
-command -v bat >/dev/null && alias cat='bat --paging=never'
+command -v bat >/dev/null && alias cat='bat -pp'
 
 # Syntax highlighting (must be sourced last)
 [ -f "${HOMEBREW_PREFIX:-}/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ] &&
@@ -476,7 +476,23 @@ EOF
         notes+=('zsh: open a new terminal; it starts zsh via ~/.bashrc.')
     fi
 
-    # ------------------------------------------------------------ 11. Tailscale (last)
+    # ------------------------------------------------------------ 11. Bitwarden
+
+    # The desktop app isn't in Homebrew on Linux; the official package is a snap.
+    step 'Bitwarden (desktop app, snap)'
+    if skipped bitwarden; then
+        skip 'not selected (CONFIG_SKIP)'
+    elif ! have snap; then
+        warn 'snap is not available; install Bitwarden from https://bitwarden.com/download/ by hand.'
+    elif snap list bitwarden >/dev/null 2>&1; then
+        skip 'already installed'
+    elif retry sudo snap install bitwarden; then
+        ok 'Bitwarden'
+    else
+        fail 'Bitwarden (snap install)'
+    fi
+
+    # ------------------------------------------------------------ 12. Tailscale (last)
 
     step 'Tailscale (installed last because it can briefly cut the internet connection)'
     if skipped tailscale; then
@@ -491,17 +507,18 @@ EOF
         fail 'Tailscale install'
     fi
 
-    # ------------------------------------------------------------ 12. check
+    # ------------------------------------------------------------ 13. check
 
     step 'Check'
     load_brew >/dev/null 2>&1
     export PATH="$HOME/.local/bin:$PATH"
-    local tools=(zsh git gh git-lfs gitleaks starship eza lsd bat fd rg mise zoxide yazi agent-browser herdr tailscale) t
+    local tools=(zsh git gh git-lfs gitleaks starship eza lsd bat fd rg mise zoxide yazi lazygit aws agent-browser herdr tailscale) t
     [ "$docker" = 1 ] && tools+=(docker)
     for t in "${tools[@]}"; do
         # Command name -> Brewfile name, where they differ.
         local name="$t"
         [ "$t" = rg ] && name=ripgrep
+        [ "$t" = aws ] && name=awscli
         if skipped "$name"; then skip "$t (CONFIG_SKIP)"
         elif have "$t"; then ok "$t"
         else fail "$t not found on PATH"; fi
