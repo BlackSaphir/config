@@ -512,7 +512,7 @@ EOF
     step 'Check'
     load_brew >/dev/null 2>&1
     export PATH="$HOME/.local/bin:$PATH"
-    local tools=(zsh git gh git-lfs gitleaks starship eza lsd bat fd rg mise zoxide yazi lazygit aws agent-browser herdr tailscale) t
+    local tools=(zsh git gh git-lfs gitleaks starship eza lsd bat fd rg mise zoxide yazi lazygit htop aws agent-browser herdr tailscale) t
     [ "$docker" = 1 ] && tools+=(docker)
     for t in "${tools[@]}"; do
         # Command name -> Brewfile name, where they differ.
