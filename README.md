@@ -242,7 +242,7 @@ Without this, zip-based tools fail on some PCs
 
 ```powershell
 winget install Git.Git GitHub.cli OpenJS.NodeJS.LTS Gitleaks.Gitleaks Starship.Starship Tailscale.Tailscale Docker.DockerDesktop Amazon.AWSCLI Bitwarden.Bitwarden
-winget install eza-community.eza lsd-rs.lsd sharkdp.bat junegunn.fzf jdx.mise ajeetdsouza.zoxide sxyazi.yazi sharkdp.fd BurntSushi.ripgrep.MSVC JesseDuffield.lazygit
+winget install eza-community.eza lsd-rs.lsd sharkdp.bat junegunn.fzf jdx.mise ajeetdsouza.zoxide sxyazi.yazi sharkdp.fd BurntSushi.ripgrep.MSVC JesseDuffield.lazygit okibcn.nano
 
 [Environment]::SetEnvironmentVariable("YAZI_FILE_ONE", "C:\Program Files\Git\usr\bin\file.exe", "User")
 ```

@@ -302,7 +302,8 @@ function Install-Config {
         'BurntSushi.ripgrep.MSVC',
         'JesseDuffield.lazygit',
         'Amazon.AWSCLI',
-        'Bitwarden.Bitwarden'
+        'Bitwarden.Bitwarden',
+        'okibcn.nano'
     )
     foreach ($p in $packages) { Install-WingetPackage $p }
 
@@ -613,7 +614,7 @@ if (Test-Cmd bat) {
         'starship' = 'Starship.Starship'; 'tailscale' = 'Tailscale.Tailscale'; 'eza' = 'eza-community.eza'
         'lsd' = 'lsd-rs.lsd'; 'bat' = 'sharkdp.bat'; 'fzf' = 'junegunn.fzf'; 'mise' = 'jdx.mise'
         'zoxide' = 'ajeetdsouza.zoxide'; 'yazi' = 'sxyazi.yazi'; 'fd' = 'sharkdp.fd'
-        'rg' = 'BurntSushi.ripgrep.MSVC'; 'lazygit' = 'JesseDuffield.lazygit'; 'aws' = 'Amazon.AWSCLI'
+        'rg' = 'BurntSushi.ripgrep.MSVC'; 'lazygit' = 'JesseDuffield.lazygit'; 'aws' = 'Amazon.AWSCLI'; 'nano' = 'okibcn.nano'
         'agent-browser' = 'agent-browser'; 'claude' = 'claude'
     }
     foreach ($t in $tools.Keys) {

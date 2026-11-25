@@ -162,7 +162,7 @@ Close and reopen the terminal after installing anything, so the new `PATH` loads
 
 ### zip packages fail with "Failed to extract archive"
 
-**Affected:** eza, lsd, bat, fzf, mise, zoxide, yazi, fd, ripgrep, lazygit: every package
+**Affected:** eza, lsd, bat, fzf, mise, zoxide, yazi, fd, ripgrep, lazygit, nano: every package
 winget ships as a `.zip`. Packages with an MSI/EXE installer (Git, Starship,
 Tailscale, Docker Desktop) install fine.
 
@@ -202,7 +202,7 @@ If this throws `E_FAIL`, winget's default extraction fails too.
 Then install the packages again:
 
 ```powershell
-winget install eza-community.eza lsd-rs.lsd sharkdp.bat junegunn.fzf jdx.mise ajeetdsouza.zoxide sxyazi.yazi sharkdp.fd BurntSushi.ripgrep.MSVC JesseDuffield.lazygit
+winget install eza-community.eza lsd-rs.lsd sharkdp.bat junegunn.fzf jdx.mise ajeetdsouza.zoxide sxyazi.yazi sharkdp.fd BurntSushi.ripgrep.MSVC JesseDuffield.lazygit okibcn.nano
 ```
 
 A missing registry key, `HKCR\CompressedFolder\CLSID`, is often part of the
@@ -290,7 +290,7 @@ In a new terminal:
 eza --version; lsd --version; bat --version; fzf --version; mise --version
 zoxide --version; yazi --version; fd --version; rg --version; starship --version
 gitleaks version; agent-browser --version; gh --version; git --version
-lazygit --version; aws --version
+lazygit --version; aws --version; nano --version
 $env:YAZI_FILE_ONE          # should be C:\Program Files\Git\usr\bin\file.exe
 Get-Module -ListAvailable PSFzf, Terminal-Icons
 ```
